@@ -1,46 +1,56 @@
 import cv2
 import numpy as np
 
-# 새로운 내부 파라미터와 왜곡 계수
-camera_matrix = np.array([[3.91517404e+02, 0.00000000e+00, 1.88267484e+03],
-                          [0.00000000e+00, 3.91899672e+02, 1.55514330e+03],
-                          [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]])
-dist_coeffs = np.array([[ 3.64094175e-02, -2.29205097e-03, -3.99212931e-02, 3.34740586e-03, 5.31703144e-05]])
+# Load camera matrix and distortion coefficients obtained from camera calibration
+camera_matrix = np.load('camera_matrix.npy')
+dist_coeffs = np.load('dist_coeffs.npy')
 
-# AR 물체 로드
-ar_object = cv2.imread('./hello.png')
+# Load video file
+video_file = './video.mp4'
+cap = cv2.VideoCapture(video_file)
 
-# Capture video from the camera
-cap = cv2.VideoCapture(0)
+# Define AR object (in this case, a red circle)
+ar_object_radius = 25
+ar_object_color = (0, 0, 255)  # Red color
+ar_object_thickness = 2
+
+# Offset to move the circle to the right (in pixels)
+offset1 = 130
+offset2 = 90
+
+# Output video settings
+output_file = 'output_video.mp4'
+frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+fps = int(cap.get(cv2.CAP_PROP_FPS))
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+out = cv2.VideoWriter(output_file, fourcc, fps, (frame_width, frame_height))
 
 while True:
     ret, frame = cap.read()
     if not ret:
         break
     
-    # Undistort the frame
+    # Undistort the frame using camera matrix and distortion coefficients
     undistorted_frame = cv2.undistort(frame, camera_matrix, dist_coeffs)
     
-    # Resize AR object to match frame size
+    # Draw AR object (red circle) at the center of the frame
     h, w, _ = undistorted_frame.shape
-    ar_object_resized = cv2.resize(ar_object, (w, h))
+    center_x = w // 2 + offset1  # Adjusted x-coordinate
+    center_y = h // 2 + offset2
+    cv2.circle(undistorted_frame, (center_x, center_y), ar_object_radius, ar_object_color, ar_object_thickness)
     
-    # Overlay the AR object at the center of the frame
-    overlay = np.zeros((h, w, 3), dtype=np.uint8)
-    x_offset = (w - ar_object_resized.shape[1]) // 2
-    y_offset = (h - ar_object_resized.shape[0]) // 2
-    overlay[y_offset:y_offset+ar_object_resized.shape[0], x_offset:x_offset+ar_object_resized.shape[1]] = ar_object_resized
-    
-    # Overlay the AR object onto the frame
-    output_frame = cv2.addWeighted(undistorted_frame, 1, overlay, 0.5, 0)
+    # Write frame to output video
+    out.write(undistorted_frame)
     
     # Display the output frame
-    cv2.imshow('AR Visualization', output_frame)
+    cv2.imshow('AR Visualization', undistorted_frame)
     
     # Press 'q' to exit
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-# Release the camera and close all windows
+# Release the video capture and close all windows
 cap.release()
+out.release()
 cv2.destroyAllWindows()
